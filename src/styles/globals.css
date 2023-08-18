@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		/* --background: 0 0% 100%; */
+		--background: 218 27% 94%;
+		/* --foreground: 0 0% 3.9%; */
+		--foreground: 220 16% 22%;
+
+		/* --muted: 0 0% 96.1%; */
+		--muted: 218 27% 92%;
+		/* --muted-foreground: 0 0% 45.1%; */
+		--muted-foreground: 219 28% 68%;
+
+		--popover: 0 0% 100%;
+		/* --popover: 0 0% 100%; */
+		/* --popover-foreground: 0 0% 3.9%; */
+		--popover-foreground: var(--foreground);
+
+		/* --card: 0 0% 100%; */
+		--card: 0 0% 100%;
+		/* --card-foreground: 0 0% 3.9%; */
+		--card-foreground: var(--foreground);
+
+		/* --border: 0 0% 89.8%; */
+		--border: 219 28% 88%;
+		/* --input: 0 0% 89.8%; */
+		--input: 219 28% 88%;
+
+		/* --primary: 0 0% 9%; */
+		--primary: var(--foreground);
+		/* --primary-foreground: 0 0% 98%; */
+		--primary-foreground: var(--background);
+
+		/* --secondary: 0 0% 96.1%; */
+		--secondary: 219 28% 88%;
+		/* --secondary-foreground: 0 0% 9%; */
+		--secondary-foreground: var(--foreground);
+
+		/* --accent: 218 27% 92%; */
+		--accent: 213 32% 52%;
+		/* --accent-foreground: 0 0% 9%; */
+		--accent-foreground: var(--background);
+
+		--destructive: 354 42% 56%;
+		--destructive-foreground: var(--background);
+
+		--ring: var(--accent);
+
+		--radius: 0.5rem;
+	}
+
+	.dark {
+		--background: 220 16% 22%;
+		--foreground: 218 27% 94%;
+
+		--muted: 222 16% 24%;
+		--muted-foreground: 219 28% 88%;
+
+		--popover: 220 16% 36%;
+		--popover-foreground: var(--foreground);
+
+		--card: 220 16% 36%;
+		--card-foreground: var(--foreground);
+
+		--border: 222 16% 28%;
+		--input: 222 16% 28%;
+
+		--primary: var(--foreground);
+		--primary-foreground: var(--background);
+
+		--secondary: 222 16% 28%;
+		--secondary-foreground: var(--foreground);
+
+		--accent: 213 32% 52%;
+		--accent-foreground: var(--foreground);
+
+		--destructive: 354 42% 56%;
+		--destructive-foreground: var(--foreground);
+
+		--ring: var(--accent);
+
+		--radius: 0.5rem;
+	}
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+
+	pre.astro-code {
+		@apply rounded-lg border border-transparent;
+	}
+
+	pre.astro-code code {
+		@apply p-4 block;
+	}
+
+	body.dark pre.astro-code {
+		@apply border-secondary;
+	}
+}

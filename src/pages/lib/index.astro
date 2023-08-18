@@ -1,0 +1,173 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { safeGetCollection } from "@/lib/content";
+import Markdown from "@/components/Markdown.astro";
+import { getEntry } from "astro:content";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { stripStorePath } from "@/lib/nix";
+import { Link2Icon } from "@radix-ui/react-icons";
+
+const members = await safeGetCollection("lib");
+
+const meta = await getEntry("meta", "data");
+
+const name = meta.data.snowfall?.meta.name ?? "flake";
+
+const isPathFlakeUri = meta.data.flake.uri.startsWith("/");
+
+const uri = isPathFlakeUri
+	? `path:${meta.data.flake.uri}`
+	: meta.data.flake.uri;
+
+const renderIdentifierPart = (name: string) => {
+	if (name.includes(".")) {
+		return `"${name}"`;
+	} else {
+		return name;
+	}
+};
+
+const renderIdentifier = (path: Array<string>, name: string) => {
+	return path.concat([name]).map(renderIdentifierPart).join(".");
+};
+
+const partitionComment = (comment: string) => {
+	const parts = {
+		normal: [] as Array<String>,
+		doc: [] as Array<String>,
+		type: [] as Array<String>,
+	};
+
+	if (comment === "") {
+		return parts;
+	}
+
+	for (const line of comment.split("\n")) {
+		if (line.startsWith("@")) {
+			parts.type.push(
+				line.startsWith("@ ") ? line.substring(2) : line.substring(1)
+			);
+		} else if (line.startsWith("#")) {
+			parts.doc.push(
+				line.startsWith("# ") ? line.substring(2) : line.substring(1)
+			);
+		} else {
+			parts.normal.push(line.startsWith(" ") ? line.substring(1) : line);
+		}
+	}
+
+	return parts;
+};
+
+const toMarkdownCodeBlock = (code: string, lang = "") => {
+	return "```" + lang + "\n" + code + "\n```";
+};
+---
+
+<Layout title="Lib">
+	<div class="px-2">
+		<h1 class="text-4xl font-black mb-2">Lib</h1>
+		<Markdown
+			of={`\`\`\`nix
+{
+	inputs = {
+		nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+
+		# Add this flake as an input.
+		${name}.url = "${uri}";
+	};
+
+	outputs = { nixpkgs, ${name}, ... }: {
+		# Use ${name}.lib
+	};
+}
+\`\`\``}
+		/>
+		<div class="pt-8 flex flex-col gap-16">
+			{
+				members.map((member) => {
+					const commentParts = partitionComment(member.data.comment);
+					const source = member.data.location ? member.data.location.file : "";
+					const sourceName = stripStorePath(
+						isPathFlakeUri ? source.replace(meta.data.flake.uri, "") : source
+					);
+
+					const identifier = renderIdentifier(
+						member.data.path,
+						member.data.name
+					);
+
+					const identifierLink = identifier.replaceAll('"', "-");
+
+					return (
+						<div>
+							<div class="w-full overflow-x-auto">
+								<a
+									href={"#" + identifierLink}
+									id={identifierLink}
+									class={cn(
+										"flex items-center gap-2 !mb-2 !pb-4 !pt-6 !px-0 hover:text-accent focus:text-accent target:text-accent text-base whitespace-nowrap",
+										buttonVariants({ variant: "link" })
+									)}
+								>
+									<Link2Icon className="w-6 h-6 mb-2" />
+									<h2 class="block text-3xl font-black mb-2">
+										lib.{identifier}
+									</h2>
+								</a>
+							</div>
+							{member.data.location ? (
+								<div class="mb-2">
+									<a
+										href={source.startsWith("/") ? `file://${source}` : source}
+										class={cn(
+											buttonVariants({ variant: "default" }),
+											"bg-muted shadow-none text-foreground hover:text-primary-foreground group hover:bg-primary focus:bg-primary active:bg-primary focus:text-primary-foreground"
+										)}
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										<span class="text-accent group-focus:text-primary-foreground group-hover:text-primary-foreground">
+											&lt;flake&gt;
+										</span>
+										{sourceName}
+									</a>
+								</div>
+							) : null}
+							<div class="flex flex-col gap-6">
+								{commentParts.type.length === 0 &&
+								commentParts.doc.length === 0 &&
+								commentParts.normal.length === 0 ? (
+									<div>No documentation available.</div>
+								) : null}
+								{commentParts.type.length > 0 ? (
+									<div>
+										<h3 class="text-xl font-black mb-2">Type</h3>
+										<Markdown
+											of={toMarkdownCodeBlock(
+												commentParts.type.join("\n"),
+												"nix"
+											)}
+										/>
+									</div>
+								) : null}
+								{commentParts.doc.length > 0 ? (
+									<div>
+										<h3 class="text-xl font-black mb-1">Documentation</h3>
+										<Markdown of={commentParts.doc.join("\n")} />
+									</div>
+								) : null}
+								{commentParts.normal.length > 0 ? (
+									<div class="w-full overflow-x-auto">
+										<pre>{commentParts.normal.join("\n")}</pre>
+									</div>
+								) : null}
+							</div>
+						</div>
+					);
+				})
+			}
+		</div>
+	</div>
+</Layout>

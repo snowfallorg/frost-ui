@@ -1,0 +1,385 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { safeGetCollection } from "@/lib/content";
+import Markdown from "@/components/Markdown.astro";
+import { getEntry } from "astro:content";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { stripStorePath } from "@/lib/nix";
+import { Link2Icon } from "@radix-ui/react-icons";
+import { Badge } from "@/components/ui/badge";
+import { flakeUriToLink } from "@/lib/flake";
+
+const options = await safeGetCollection("options");
+
+const modules = new Map();
+
+const unknown = [];
+
+for (const option of options) {
+	const declaration = option.data.declarations?.[0];
+
+	if (!declaration) {
+		unknown.push(option);
+		continue;
+	}
+
+	if (!modules.has(declaration.path)) {
+		modules.set(declaration.path, {
+			options: [],
+		});
+	}
+
+	const mod = modules.get(declaration.path);
+	mod.options.push(option.data);
+}
+
+const meta = await getEntry("meta", "data");
+
+const name = meta.data.snowfall?.meta.name ?? "flake";
+
+const isPathFlakeUri = meta.data.flake.uri.startsWith("/");
+
+const uri = isPathFlakeUri
+	? `path:${meta.data.flake.uri}`
+	: meta.data.flake.uri;
+
+const renderIdentifierPart = (name: string) => {
+	if (name.includes(".")) {
+		return `"${name}"`;
+	} else {
+		return name;
+	}
+};
+
+const renderIdentifier = (path: Array<string>, name?: string) => {
+	if (!name) {
+		return path.map(renderIdentifierPart).join(".");
+	}
+
+	return path.concat([name]).map(renderIdentifierPart).join(".");
+};
+
+const partitionComment = (comment: string) => {
+	const parts = {
+		normal: [] as Array<String>,
+		doc: [] as Array<String>,
+		type: [] as Array<String>,
+	};
+
+	if (comment === "") {
+		return parts;
+	}
+
+	for (const line of comment.split("\n")) {
+		if (line.startsWith("@")) {
+			parts.type.push(
+				line.startsWith("@ ") ? line.substring(2) : line.substring(1)
+			);
+		} else if (line.startsWith("#")) {
+			parts.doc.push(
+				line.startsWith("# ") ? line.substring(2) : line.substring(1)
+			);
+		} else {
+			parts.normal.push(line.startsWith(" ") ? line.substring(1) : line);
+		}
+	}
+
+	return parts;
+};
+
+const toMarkdownCodeBlock = (code: string, lang = "") => {
+	return "```" + lang + "\n" + code + "\n```";
+};
+---
+
+<Layout title="Options">
+	<div>
+		<div class="px-2">
+			<h1 class="text-4xl font-black mb-2">Options</h1>
+			<Markdown
+				of={`\`\`\`nix
+{
+	inputs = {
+		nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+
+		# Add this flake as an input.
+		${name}.url = "${uri}";
+	};
+
+	outputs = { nixpkgs, ${name}, ... }: {
+		# Use ${name}.nixosModules
+	};
+}
+\`\`\``}
+			/>
+		</div>
+		<div class="pt-8 flex flex-col gap-16">
+			{
+				meta.data.snowfall != null
+					? [...modules.entries()].map(([path, mod]) => {
+							const modName = path.replace(
+								/modules\/(?:(?:nixos|darwin|home)\/)?(.+)\/default\.nix/,
+								"$1"
+							);
+
+							const declaration = mod.options[0].declarations[0];
+							const source = declaration.url.startsWith("/")
+								? `file://${declaration.url}`
+								: declaration.url;
+
+							return (
+								<div>
+									<div class="sticky top-14 z-10 bg-background py-2 w-full">
+										<div class="overflow-x-auto px-2">
+											<a
+												href={"#" + modName}
+												id={modName}
+												class={cn(
+													buttonVariants({ variant: "link" }),
+													"flex justify-start w-full gap-2 !mb-2 !pb-4 !pt-4 !px-0 hover:text-accent focus:text-accent target:text-accent text-base whitespace-nowrap"
+												)}
+											>
+												<Link2Icon className="inline-block shrink-0 w-6 h-6 mb-2" />
+												<h2 class="block text-3xl font-black mb-2">
+													nixosModules."{modName}"
+												</h2>
+											</a>
+											<a
+												href={
+													source.startsWith("/") ? `file://${source}` : source
+												}
+												class={cn(
+													buttonVariants({ variant: "default" }),
+													"bg-muted shadow-none text-foreground hover:text-primary-foreground group hover:bg-primary focus:bg-primary active:bg-primary focus:text-primary-foreground active:text-primary-foreground whitespace-nowrap"
+												)}
+												target="_blank"
+												rel="noopener noreferrer"
+											>
+												<span class="text-accent group-focus:text-primary-foreground group-hover:text-primary-foreground group-active:text-primary-foreground">
+													&lt;flake&gt;
+												</span>
+												/{path}
+											</a>
+										</div>
+									</div>
+									<div class="flex flex-col gap-8 border-l border-l-secondary px-4">
+										{mod.options.map((option) => {
+											if (option.loc[0] === "_module") {
+												return null;
+											}
+
+											const identifier = renderIdentifier(option.loc);
+
+											return (
+												<div class="">
+													<div class="flex flex-col">
+														<div
+															id={identifier}
+															class="flex items-start group w-full overflow-x-auto"
+														>
+															<a
+																href={"#" + identifier}
+																class={cn(
+																	buttonVariants({ variant: "link" }),
+																	"flex items-center gap-2 px-0 h-auto hover:text-accent focus:text-accent text-base group-target:text-accent"
+																)}
+															>
+																<h3 class="text-xl font-black whitespace-nowrap">
+																	<Link2Icon className="w-5 h-5 inline-block" />
+																	{identifier}
+																</h3>
+															</a>
+														</div>
+														{option.readOnly ? (
+															<div class="mb-2 pointer-events-none">
+																{option.readOnly ? (
+																	<Badge variant="destructive">Read Only</Badge>
+																) : null}
+															</div>
+														) : null}
+														<div class="flex flex-col gap-4">
+															{option.description ? (
+																<div class="pt-0 w-full overflow-x-auto">
+																	{typeof option.description === "string" ? (
+																		option.description
+																	) : option.description._type ===
+																	  "literalExpression" ? (
+																		<Markdown
+																			of={`\`\`\`nix\n${option.description.text}\n\`\`\``}
+																		/>
+																	) : option.description._type === "mdDoc" ? (
+																		<Markdown of={option.description.text} />
+																	) : null}
+																</div>
+															) : null}
+															<div>
+																<h4 class="text-lg font-black mb-1">Type</h4>
+																<Markdown
+																	of={`\`\`\`\n${option.type}\n\`\`\``}
+																/>
+															</div>
+															{option.default ? (
+																<div>
+																	<h4 class="text-lg font-black mb-1">
+																		Default
+																	</h4>
+																	{typeof option.default === "string" ? (
+																		<Markdown
+																			of={`\`\`\`\n${option.type}\n\`\`\``}
+																		/>
+																	) : option.default._type ===
+																	  "literalExpression" ? (
+																		<Markdown
+																			of={`\`\`\`nix\n${option.default.text}\n\`\`\``}
+																		/>
+																	) : option.default._type === "mdDoc" ? (
+																		<Markdown of={option.default.text} />
+																	) : null}
+																</div>
+															) : null}
+															{option.example ? (
+																<div>
+																	<h4 class="text-lg font-black mb-1">
+																		Example
+																	</h4>
+																	{typeof option.example === "string" ? (
+																		<Markdown
+																			of={`\`\`\`nix\n${option.example}\n\`\`\``}
+																		/>
+																	) : option.example._type ===
+																	  "literalExpression" ? (
+																		<Markdown
+																			of={`\`\`\`nix\n${option.example.text}\n\`\`\``}
+																		/>
+																	) : option.example._type === "mdDoc" ? (
+																		<Markdown of={option.example.text} />
+																	) : null}
+																</div>
+															) : null}
+														</div>
+													</div>
+												</div>
+											);
+										})}
+									</div>
+								</div>
+							);
+					  })
+					: options.map(({ data: option }) => {
+							const identifier = renderIdentifier(option.loc);
+							const declaration = option.declarations[0];
+							const source = declaration.url.startsWith("/")
+								? `file://${declaration.url}`
+								: declaration.url;
+							const path = declaration.path;
+
+							console.log(declaration);
+
+							if (option.loc[0] === "_module") {
+								return null;
+							}
+
+							return (
+								<div class="px-2">
+									<div class="flex flex-col">
+										<div
+											id={identifier}
+											class="flex flex-col items-start group w-full overflow-x-auto"
+										>
+											<div class="flex justify-start">
+												<a
+													href={"#" + identifier}
+													class={cn(
+														buttonVariants({ variant: "link" }),
+														"flex items-center gap-2 px-0 h-auto hover:text-accent focus:text-accent text-base group-target:text-accent"
+													)}
+												>
+													<h3 class="text-xl font-black whitespace-nowrap">
+														<Link2Icon className="w-5 h-5 inline-block" />
+														{identifier}
+													</h3>
+												</a>
+											</div>
+										</div>
+										<div>
+											<a
+												href={flakeUriToLink(uri, path)}
+												class={cn(
+													buttonVariants({ variant: "default" }),
+													"bg-muted shadow-none text-foreground hover:text-primary-foreground group hover:bg-primary focus:bg-primary active:bg-primary focus:text-primary-foreground active:text-primary-foreground whitespace-nowrap"
+												)}
+												target="_blank"
+												rel="noopener noreferrer"
+											>
+												<span class="text-accent group-focus:text-primary-foreground group-hover:text-primary-foreground group-active:text-primary-foreground">
+													&lt;flake&gt;
+												</span>
+												/{stripStorePath(declaration.path)}
+											</a>
+										</div>
+										{option.readOnly ? (
+											<div class="mb-2 pointer-events-none">
+												{option.readOnly ? (
+													<Badge variant="destructive">Read Only</Badge>
+												) : null}
+											</div>
+										) : null}
+										<div class="flex flex-col gap-4 pt-2">
+											{option.description ? (
+												<div class="pt-0 w-full overflow-x-auto">
+													{typeof option.description === "string" ? (
+														option.description
+													) : option.description._type ===
+													  "literalExpression" ? (
+														<Markdown
+															of={`\`\`\`nix\n${option.description.text}\n\`\`\``}
+														/>
+													) : option.description._type === "mdDoc" ? (
+														<Markdown of={option.description.text} />
+													) : null}
+												</div>
+											) : null}
+											<div>
+												<h4 class="text-lg font-black mb-1">Type</h4>
+												<Markdown of={`\`\`\`\n${option.type}\n\`\`\``} />
+											</div>
+											{option.default ? (
+												<div>
+													<h4 class="text-lg font-black mb-1">Default</h4>
+													{typeof option.default === "string" ? (
+														<Markdown of={`\`\`\`\n${option.type}\n\`\`\``} />
+													) : option.default._type === "literalExpression" ? (
+														<Markdown
+															of={`\`\`\`nix\n${option.default.text}\n\`\`\``}
+														/>
+													) : option.default._type === "mdDoc" ? (
+														<Markdown of={option.default.text} />
+													) : null}
+												</div>
+											) : null}
+											{option.example ? (
+												<div>
+													<h4 class="text-lg font-black mb-1">Example</h4>
+													{typeof option.example === "string" ? (
+														<Markdown
+															of={`\`\`\`nix\n${option.example}\n\`\`\``}
+														/>
+													) : option.example._type === "literalExpression" ? (
+														<Markdown
+															of={`\`\`\`nix\n${option.example.text}\n\`\`\``}
+														/>
+													) : option.example._type === "mdDoc" ? (
+														<Markdown of={option.example.text} />
+													) : null}
+												</div>
+											) : null}
+										</div>
+									</div>
+								</div>
+							);
+					  })
+			}
+		</div>
+	</div>
+</Layout>

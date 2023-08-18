@@ -1,0 +1,279 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { safeGetCollection } from "@/lib/content";
+import Markdown from "@/components/Markdown.astro";
+import { getEntry } from "astro:content";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { stripStorePath } from "@/lib/nix";
+import {
+	Link2Icon,
+	GitHubLogoIcon,
+	EnvelopeClosedIcon,
+	ChatBubbleIcon,
+} from "@radix-ui/react-icons";
+import { Badge } from "@/components/ui/badge";
+import { flakeUriToLink } from "@/lib/flake";
+
+const packages = await safeGetCollection("packages");
+
+const meta = await getEntry("meta", "data");
+
+const flakeName = meta.data.snowfall?.meta.name ?? "flake";
+
+const isPathFlakeUri = meta.data.flake.uri.startsWith("/");
+
+const uri = isPathFlakeUri
+	? `path:${meta.data.flake.uri}`
+	: meta.data.flake.uri;
+
+const renderIdentifierPart = (name: string) => {
+	if (name.includes(".")) {
+		return `"${name}"`;
+	} else {
+		return name;
+	}
+};
+
+const renderIdentifier = (path: Array<string>, name: string) => {
+	return path.concat([name]).map(renderIdentifierPart).join(".");
+};
+
+const toMarkdownCodeBlock = (code: string, lang = "") => {
+	return "```" + lang + "\n" + code + "\n```";
+};
+---
+
+<Layout title="Packages">
+	<div class="px-2">
+		<h1 class="text-4xl font-black mb-2">Packages</h1>
+		<Markdown
+			of={`\`\`\`nix
+{
+	inputs = {
+		nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+
+		# Add this flake as an input.
+		${flakeName}.url = "${uri}";
+	};
+
+	outputs = { nixpkgs, ${flakeName}, ... }: {
+		# Use ${flakeName}.packages
+	};
+}
+\`\`\``}
+		/>
+		<div class="pt-8 flex flex-col gap-16">
+			{
+				packages.map((pkg) => {
+					const {
+						name,
+						systems,
+						available,
+						broken,
+						insecure,
+						unfree,
+						unsupported,
+						outputs,
+						description,
+						longDescription,
+						position,
+						snowfall,
+						license,
+						homepage,
+						maintainers,
+					} = pkg.data;
+
+					const snowfallFile = snowfall?.path ?? "";
+					const [positionFile] = (position ?? "").split(":");
+
+					const file = positionFile || snowfallFile;
+
+					const source = stripStorePath(file);
+
+					return (
+						<div>
+							<div class="w-full">
+								<div class="w-full overflow-x-auto">
+									<a
+										href={"#" + name}
+										id={name}
+										class={cn(
+											"flex items-center gap-2 !mb-2 !pb-4 !pt-6 !px-0 hover:text-accent focus:text-accent target:text-accent text-base whitespace-nowrap",
+											buttonVariants({ variant: "link" })
+										)}
+									>
+										<Link2Icon className="w-6 h-6 mb-2" />
+										<h2 class="block text-3xl font-black mb-2">{name}</h2>
+									</a>
+									<div class="flex flex-col gap-1">
+										<div class="flex gap-1 flex-wrap">
+											{systems.map((system: string) => (
+												<Badge className="pointer-events-none whitespace-nowrap">
+													{system}
+												</Badge>
+											))}
+										</div>
+										<div class="flex gap-1 flex-wrap">
+											{homepage ? (
+												<Badge
+													className="whitespace-nowrap text-accent-foreground bg-accent hover:bg-accent active:bg-accent focus:bg-accent hover:text-accent-foreground active:text-accent-foreground focus:text-accent-foreground"
+													asChild
+												>
+													<a
+														href={homepage}
+														target="_blank"
+														rel="noopener noreferrer"
+													>
+														Homepage
+													</a>
+												</Badge>
+											) : null}
+											{unfree ? (
+												<Badge
+													variant="outline"
+													className="whitespace-nowrap pointer-events-none"
+												>
+													Unfree
+												</Badge>
+											) : null}
+											{license ? (
+												typeof license === "string" ? (
+													<Badge
+														variant="outline"
+														className="whitespace-nowrap"
+													>
+														{license}
+													</Badge>
+												) : (
+													<Badge
+														variant="outline"
+														className="whitespace-nowrap"
+														asChild
+													>
+														<a
+															href={license.url}
+															target="_blank"
+															rel="noopener noreferrer"
+														>
+															{license.fullName}
+														</a>
+													</Badge>
+												)
+											) : null}
+											{broken ? (
+												<Badge
+													variant="destructive"
+													className="whitespace-nowrap pointer-events-none"
+												>
+													Broken
+												</Badge>
+											) : null}
+											{insecure ? (
+												<Badge
+													variant="destructive"
+													className="whitespace-nowrap pointer-events-none"
+												>
+													Insecure
+												</Badge>
+											) : null}
+											{unsupported ? (
+												<Badge
+													variant="destructive"
+													className="whitespace-nowrap pointer-events-none"
+												>
+													Unsupported
+												</Badge>
+											) : null}
+											{!available ? (
+												<Badge
+													variant="destructive"
+													className="whitespace-nowrap pointer-events-none"
+												>
+													Unavailable
+												</Badge>
+											) : null}
+										</div>
+									</div>
+									{file ? (
+										<div class="pt-2">
+											<a
+												href={flakeUriToLink(uri, stripStorePath(file))}
+												class={cn(
+													buttonVariants({ variant: "default" }),
+													"bg-muted shadow-none text-foreground hover:text-primary-foreground group hover:bg-primary focus:bg-primary active:bg-primary focus:text-primary-foreground whitespace-nowrap"
+												)}
+												target="_blank"
+												rel="noopener noreferrer"
+											>
+												<span class="text-accent group-focus:text-primary-foreground group-hover:text-primary-foreground">
+													&lt;{flakeName}&gt;
+												</span>
+												{source}
+											</a>
+										</div>
+									) : null}
+								</div>
+								{longDescription || description ? (
+									<div class="pt-4">
+										<Markdown of={longDescription ?? description} />
+									</div>
+								) : null}
+								<div class="pt-4">
+									<Markdown
+										of={`
+\`\`\`nix
+let
+	${name} = ${flakeName}.packages.<system>.${name};
+in
+	# Use ${name}
+\`\`\``}
+									/>
+								</div>
+								{maintainers.length > 0 ? (
+									<div class="pt-4 flex flex-wrap gap-1">
+										{maintainers.map((maintainer) => (
+											<div class="px-4 py-2 bg-muted rounded-md font-bold flex gap-4">
+												{maintainer.name}
+												{maintainer.github ? (
+													<a
+														href={`https://github.com/${maintainer.github}`}
+														target="_blank"
+														rel="noopener noreferrer"
+														aria-label="GitHub"
+													>
+														<GitHubLogoIcon className="w-5 h-6" />
+													</a>
+												) : null}
+												{maintainer.email ? (
+													<a
+														href={`mailto:${maintainer.email}`}
+														target="_blank"
+														rel="noopener noreferrer"
+														aria-label="Email"
+													>
+														<EnvelopeClosedIcon className="w-5 h-6" />
+													</a>
+												) : null}
+												{maintainer.matrix ? (
+													<a
+														href={`https://matrix.to/#/${maintainer.matrix}`}
+														target="_blank"
+														rel="noopener noreferrer"
+														aria-label="Matrix"
+													>
+														<ChatBubbleIcon className="w-5 h-6" />
+													</a>
+												) : null}
+											</div>
+										))}
+									</div>
+								) : null}
+							</div>
+						</div>
+					);
+				})
+			}
+		</div>
+	</div>
+</Layout>

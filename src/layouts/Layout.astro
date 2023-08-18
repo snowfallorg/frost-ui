@@ -1,36 +1,98 @@
 ---
+import "../styles/globals.css";
+import AppHeader from "@/components/app/AppHeader";
+import { APP_THEME_KEY, AppTheme } from "@/components/app/AppHeader";
+import { safeGetCollection } from "@/lib/content";
+import { titleCase } from "title-case";
+
 export interface Props {
 	title: string;
 }
 
 const { title } = Astro.props;
+
+const collections = {
+	lib: await safeGetCollection("lib"),
+	apps: await safeGetCollection("apps"),
+	options: await safeGetCollection("options"),
+	overlays: await safeGetCollection("overlays"),
+	packages: await safeGetCollection("packages"),
+	shells: await safeGetCollection("shells"),
+};
+
+const links: Record<string, { name: string; path: string }> = {};
+
+for (const [key, value] of Object.entries(collections)) {
+	if (value.length > 0) {
+		links[key] = {
+			name: titleCase(key),
+			path: `${import.meta.env.BASE_URL}${key}`,
+		};
+	}
+}
 ---
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="min-h-full">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="Astro description">
+		<meta name="description" content="Astro description" />
 		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/svg+xml" href="/nix-light.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap"
+			rel="stylesheet"
+		/>
 	</head>
-	<body>
-		<slot />
+	<body
+		class="font-sans text-base text-foreground bg-background transition-none overflow-x-hidden min-h-full overflow-y-auto"
+	>
+		<script is:inline define:vars={{ APP_THEME_KEY, AppTheme }}>
+			try {
+				let theme = window.localStorage.getItem(APP_THEME_KEY);
+
+				if (theme === null) {
+					theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+						? AppTheme.Dark
+						: AppTheme.Light;
+				} else {
+					theme = JSON.parse(theme);
+				}
+
+				if (theme === AppTheme.Light) {
+					document.body.classList.remove("dark");
+
+					const icon = document.querySelector(`link[rel="icon"]`);
+					icon.href = "/nix-dark.svg";
+				} else {
+					document.body.classList.add("dark");
+				}
+			} catch (error) {
+				console.error(`Theme failed to apply:`, error);
+			}
+		</script>
+		<AppHeader client:load links={links} />
+		<div class="flex flex-col min-h-[calc(100svh-56px)]">
+			<main class="w-full max-w-5xl mx-auto pt-4 grow">
+				<slot />
+			</main>
+			<footer class="py-4 text-center">
+				<span class="text-muted-foreground">
+					Created with
+					<a
+						href="https://github.com/snowfallorg/frost"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-accent underline"
+					>
+						Frost
+					</a>
+				</span>
+			</footer>
+		</div>
 	</body>
 </html>
-<style is:global>
-	:root {
-		--accent: 124, 58, 237;
-		--accent-gradient: linear-gradient(45deg, rgb(var(--accent)), #da62c4 30%, white 60%);
-	}
-	html {
-		font-family: system-ui, sans-serif;
-		background-color: #F6F6F6;
-	}
-	code {
-		font-family: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono,
-			Bitstream Vera Sans Mono, Courier New, monospace;
-	}
-</style>

@@ -1,0 +1,35 @@
+---
+import { Markdown as MarkdownComponent } from "@astropub/md";
+
+type MarkdownProps = Parameters<typeof MarkdownComponent>[0];
+
+export interface Props extends MarkdownProps {}
+
+const { of } = Astro.props;
+---
+
+<div class="markdown">
+	<MarkdownComponent of={of} />
+</div>
+
+<style>
+	.markdown {
+	}
+
+	.markdown :global(p) {
+		@apply mb-2;
+	}
+
+	.markdown :global(a) {
+		@apply text-accent hover:underline focus:underline;
+	}
+
+	.markdown > :global(code),
+	.markdown :global(*:not(pre) > code) {
+		@apply inline bg-primary text-primary-foreground px-1 py-[2px] mx-[1px] rounded-md break-all;
+	}
+
+	.markdown :global(pre + *) {
+		@apply mt-2;
+	}
+</style>
