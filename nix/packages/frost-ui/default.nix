@@ -3,12 +3,12 @@
 , lib
 , frost-base ? "/"
 , frost-data ? null
-, self
 }:
 
 let
   src = lib.snowfall.fs.get-file "";
-  version = self.sourceInfo.shortRev or "dirty";
+  package-json = lib.importJSON (lib.snowfall.fs.get-file "package.json");
+  version = package-json.version;
 
   frost-ui = buildNpmPackage ({
     inherit src version;
